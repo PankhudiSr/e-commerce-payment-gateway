@@ -1,0 +1,43 @@
+2026-01-08 23:32:49 INFO  o.s.t.c.s.AnnotationConfigContextLoaderUtils - Could not detect default configuration classes for test class [com.intern.ecommerce.paymentgateway.PaymentGatewayApplicationTests]: PaymentGatewayApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-01-08 23:32:49 INFO  o.s.b.t.c.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.intern.ecommerce.paymentgateway.PaymentGatewayApplication for test class com.intern.ecommerce.paymentgateway.PaymentGatewayApplicationTests
+2026-01-08 23:32:49 INFO  o.s.b.d.r.RestartApplicationListener - Restart disabled due to context in which it is running
+2026-01-08 23:32:50 WARN  o.s.b.t.j.DuplicateJsonObjectContextCustomizerFactory$DuplicateJsonObjectContextCustomizer - 
+
+Found multiple occurrences of org.json.JSONObject on the class path:
+
+	jar:file:/C:/Users/Pankhudi/.m2/repository/org/json/json/20180130/json-20180130.jar!/org/json/JSONObject.class
+	jar:file:/C:/Users/Pankhudi/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar!/org/json/JSONObject.class
+
+You may wish to exclude one of them to ensure predictable runtime behavior
+
+2026-01-08 23:32:50 INFO  c.i.e.p.PaymentGatewayApplicationTests - Starting PaymentGatewayApplicationTests using Java 21.0.9 with PID 30316 (started by Pankhudi in C:\Users\Pankhudi\Downloads\paymentgateway\paymentgateway)
+2026-01-08 23:32:50 INFO  c.i.e.p.PaymentGatewayApplicationTests - No active profile set, falling back to 1 default profile: "default"
+2026-01-08 23:32:52 INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-08 23:32:52 INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 139 ms. Found 1 JPA repository interface.
+2026-01-08 23:32:54 INFO  org.hibernate.orm.jpa - HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-01-08 23:32:54 INFO  org.hibernate.orm.core - HHH000001: Hibernate ORM core version 7.2.0.Final
+2026-01-08 23:32:55 INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-08 23:32:56 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-01-08 23:32:57 INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@5ae16aa
+2026-01-08 23:32:57 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-01-08 23:32:58 INFO  o.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [jdbc:mysql://localhost:3306/paymentorder?createDatabaseIfNotExist=true]
+	Database driver: MySQL Connector/J
+	Database dialect: MySQLDialect
+	Database version: 9.5
+	Default catalog/schema: paymentorder/undefined
+	Autocommit mode: undefined/unknown
+	Isolation level: REPEATABLE_READ [default REPEATABLE_READ]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-01-08 23:33:00 INFO  org.hibernate.orm.core - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-08 23:33:00 INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-08 23:33:01 INFO  o.s.d.j.r.q.QueryEnhancerFactories - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-01-08 23:33:01 INFO  c.i.e.p.service.OrderService - Initializing Razorpay client
+2026-01-08 23:33:01 WARN  o.s.b.j.a.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-08 23:33:03 INFO  c.i.e.p.PaymentGatewayApplicationTests - Started PaymentGatewayApplicationTests in 13.215 seconds (process running for 17.7)
+2026-01-08 23:33:04 INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-01-08 23:33:04 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-01-08 23:33:04 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
