@@ -65,11 +65,12 @@
             "order_id": order.razorpayOrderId,
             "receipt": order.email,
 
-            "callback_url": "http://localhost:8080/paymentCallback",
+            "callback_url": "/paymentCallback",
 
             "prefill": {
                 "name": order.name,
-                "email": order.email
+                "email": order.email,
+                "amount":order.amount
             },
             "theme": {
                 "color": "#339900"
