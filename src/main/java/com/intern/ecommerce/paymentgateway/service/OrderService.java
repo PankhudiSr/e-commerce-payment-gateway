@@ -1,4 +1,6 @@
 package com.intern.ecommerce.paymentgateway.service;
+import com.intern.ecommerce.paymentgateway.security.AESUtil;
+import com.intern.ecommerce.paymentgateway.common.Constants;
 
 import java.util.Map;
 
@@ -26,11 +28,13 @@ public class OrderService {
     @Autowired
     private OrdersRepository ordersRepository;
 
-    @Value("${razorpay.key.id}")
-    private String razorpayId;
+    @Value("${razorpay.key.id.enc}")
+    private String encryptedKeyId;
 
-    @Value("${razorpay.key.secret}")
-    private String razorpaySecret;
+    @Value("${razorpay.key.secret.enc}")
+    private String encryptedKeySecret;
+
+
 
     private RazorpayClient razorpayClient;
 
@@ -39,12 +43,20 @@ public class OrderService {
     public void init() {
         try {
             logger.info("Initializing Razorpay client");
+
+            String razorpayId = AESUtil.decrypt(encryptedKeyId);
+            String razorpaySecret = AESUtil.decrypt(encryptedKeySecret);
+
             this.razorpayClient = new RazorpayClient(razorpayId, razorpaySecret);
-        } catch (RazorpayException e) {
+
+            logger.info("Razorpay client initialized successfully");
+
+        } catch (Exception e) {
             logger.error("Failed to initialize Razorpay client", e);
             throw new RuntimeException("Razorpay initialization failed");
         }
     }
+
 
     // Create Order
     public Orders createOrder(Orders order) {
@@ -54,7 +66,7 @@ public class OrderService {
 
             JSONObject options = new JSONObject();
             options.put("amount", order.getAmount() * 100); // in paise
-            options.put("currency", "INR");
+            options.put("currency", Constants.CURRENCY_INR);
             options.put("receipt", order.getEmail());
 
             Order razorpayOrder = razorpayClient.orders.create(options);
@@ -100,7 +112,7 @@ public class OrderService {
             throw new RuntimeException("Order not found");
         }
 
-        order.setOrderStatus("PAYMENT DONE");
+        order.setOrderStatus(Constants.PAYMENT_DONE);
 
         Orders updatedOrder = ordersRepository.save(order);
 
@@ -109,4 +121,3 @@ public class OrderService {
         return updatedOrder;
     }
 }
-
