@@ -1,13 +1,17 @@
 spring.application.name=PaymentGateway
-spring.datasource.url=jdbc:mysql://localhost:3306/dbname
-spring.datasource.username=username
-spring.datasource.password=Password
+
+spring.datasource.url=${SPRING_DATASOURCE_URL}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD}
+
+aes.secret.key=${AES_SECRET_KEY}
+
 spring.jpa.hibernate.ddl-auto=update
-aes.secret.key=xxxxx
 
-
-razorpay.key.id=rzp_test_xxxxx
-razorpay.key.secret=xxxxxx
+razorpay.key.id.enc=${RAZORPAY_KEY_ID_ENC}
+razorpay.key.secret.enc=${RAZORPAY_KEY_SECRET_ENC}
 
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+server.port=${PORT:8080}
