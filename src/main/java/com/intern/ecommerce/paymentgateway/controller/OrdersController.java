@@ -50,12 +50,20 @@ public class OrdersController {
 
     // Payment callback
     @PostMapping("/paymentCallback")
-    public String paymentCallback(@RequestParam Map<String, String> response) {
+    @ResponseBody
+    public ResponseEntity<?> paymentCallback(@RequestParam Map<String, String> response) {
 
-        logger.info("Payment callback received");
-        orderService.updateStatus(response);
+        logger.info("Payment callback received: {}", response);
+
+        Orders updatedOrder = orderService.updateStatus(response);
 
         logger.info("Payment status updated successfully");
-        return "success";
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Payment status updated",
+                "orderId", updatedOrder.getOrderId(),
+                "razorpayOrderId", updatedOrder.getRazorpayOrderId(),
+                "status", updatedOrder.getOrderStatus()
+        ));
     }
 }
