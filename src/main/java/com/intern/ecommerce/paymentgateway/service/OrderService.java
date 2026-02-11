@@ -16,6 +16,8 @@ import com.intern.ecommerce.paymentgateway.repository.OrdersRepository;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
+import com.razorpay.Payment;
+
 
 import jakarta.annotation.PostConstruct;
 
@@ -91,6 +93,7 @@ public class OrderService {
     }
 
     // Update payment status
+    // Update payment status (callback_url only)
     public Orders updateStatus(Map<String, String> map) {
 
         logger.info("Updating payment status");
@@ -100,9 +103,30 @@ public class OrderService {
         }
 
         String razorpayOrderId = map.get("razorpay_order_id");
+        String paymentId = map.get("razorpay_payment_id");
+
+        // ✅ If order_id missing, fetch it from Razorpay using payment_id
+        if (razorpayOrderId == null || razorpayOrderId.isBlank()) {
+
+            if (paymentId == null || paymentId.isBlank()) {
+                throw new IllegalArgumentException("Both razorpay_order_id and razorpay_payment_id are missing");
+            }
+
+            try {
+                Payment payment = razorpayClient.payments.fetch(paymentId);
+                Object oid = payment.get("order_id");
+                razorpayOrderId = (oid != null) ? oid.toString() : null;
+
+                logger.info("Fetched order_id from payment: {}", razorpayOrderId);
+
+            } catch (RazorpayException e) {
+                logger.error("Failed to fetch payment details from Razorpay", e);
+                throw new RuntimeException("Failed to fetch payment details");
+            }
+        }
 
         if (razorpayOrderId == null || razorpayOrderId.isBlank()) {
-            throw new IllegalArgumentException("Razorpay order ID is missing");
+            throw new IllegalArgumentException("Razorpay order ID is missing even after fetching payment");
         }
 
         Orders order = ordersRepository.findByRazorpayOrderId(razorpayOrderId);
@@ -115,9 +139,9 @@ public class OrderService {
         order.setOrderStatus(Constants.PAYMENT_DONE);
 
         Orders updatedOrder = ordersRepository.save(order);
-
         logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
 
         return updatedOrder;
     }
+
 }

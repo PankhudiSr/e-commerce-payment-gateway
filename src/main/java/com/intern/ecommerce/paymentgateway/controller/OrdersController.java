@@ -57,8 +57,6 @@ public class OrdersController {
 
         Orders updatedOrder = orderService.updateStatus(response);
 
-        logger.info("Payment status updated successfully");
-
         return ResponseEntity.ok(Map.of(
                 "message", "Payment status updated",
                 "orderId", updatedOrder.getOrderId(),
