@@ -1,5 +1,6 @@
-
 package com.intern.ecommerce.paymentgateway.controller;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
 
 import java.util.Map;
 
@@ -9,17 +10,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import com.intern.ecommerce.paymentgateway.model.Orders;
 import com.intern.ecommerce.paymentgateway.service.OrderService;
 import com.razorpay.RazorpayException;
 
 @Controller
+@CrossOrigin(origins = "http://localhost:5173")
 public class OrdersController {
 
     private static final Logger logger =
@@ -28,27 +26,50 @@ public class OrdersController {
     @Autowired
     private OrderService orderService;
 
-    // Load Orders page
+    // Load Orders page (if you are using Thymeleaf / template)
     @GetMapping("/orders")
     public String ordersPage() {
         logger.info("Orders page requested");
         return "orders";
     }
 
-    // Create Razorpay order
+    // ✅ ONLINE: Create Razorpay order
+    // Frontend calls: POST /createOrder
     @PostMapping(value = "/createOrder", produces = "application/json")
     @ResponseBody
     public ResponseEntity<Orders> createOrder(@RequestBody Orders orders)
             throws RazorpayException {
 
-        logger.info("Create order API called");
+        logger.info("Create ONLINE order API called");
+        // ensure it's ONLINE
+        orders.setPaymentMode("ONLINE");
+        // status stays PENDING until paymentCallback updates it
+        orders.setOrderStatus("PENDING");
+
         Orders razorpayOrder = orderService.createOrder(orders);
 
-        logger.info("Order created successfully with ID: {}", razorpayOrder.getOrderId());
+        logger.info("ONLINE order created successfully with ID: {}", razorpayOrder.getOrderId());
         return new ResponseEntity<>(razorpayOrder, HttpStatus.CREATED);
     }
 
-    // Payment callback
+    // ✅ COD: Create order without Razorpay
+    // Frontend calls: POST /createCodOrder
+    @PostMapping(value = "/createCodOrder", produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<Orders> createCodOrder(@RequestBody Orders orders) {
+
+        logger.info("Create COD order API called");
+        orders.setPaymentMode("COD");
+        orders.setOrderStatus("PENDING");
+        orders.setRazorpayOrderId(null);
+
+        Orders saved = orderService.createCodOrder(orders);
+
+        logger.info("COD order created successfully with ID: {}", saved.getOrderId());
+        return new ResponseEntity<>(saved, HttpStatus.CREATED);
+    }
+
+    // ✅ Payment callback (Razorpay success/fail)
     @PostMapping("/paymentCallback")
     @ResponseBody
     public ResponseEntity<?> paymentCallback(@RequestParam Map<String, String> response) {
@@ -61,7 +82,20 @@ public class OrdersController {
                 "message", "Payment status updated",
                 "orderId", updatedOrder.getOrderId(),
                 "razorpayOrderId", updatedOrder.getRazorpayOrderId(),
-                "status", updatedOrder.getOrderStatus()
+                "status", updatedOrder.getOrderStatus(),
+                "paymentMode", updatedOrder.getPaymentMode(),
+                "estimatedDeliveryDate", updatedOrder.getEstimatedDeliveryDate()
         ));
+    }
+
+    // ✅ API for Success Page (React)
+    // Frontend calls: GET /api/orders/{orderId}
+    @GetMapping(value = "/api/orders/{orderId}", produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<Orders> getOrder(@PathVariable Integer orderId) {
+
+        logger.info("Get order details for success page: {}", orderId);
+        Orders order = orderService.getOrderById(orderId);
+        return ResponseEntity.ok(order);
     }
 }

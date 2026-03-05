@@ -1,7 +1,9 @@
 package com.intern.ecommerce.paymentgateway.service;
+
 import com.intern.ecommerce.paymentgateway.security.AESUtil;
 import com.intern.ecommerce.paymentgateway.common.Constants;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 import org.json.JSONObject;
@@ -17,7 +19,6 @@ import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import com.razorpay.Payment;
-
 
 import jakarta.annotation.PostConstruct;
 
@@ -35,8 +36,6 @@ public class OrderService {
 
     @Value("${razorpay.key.secret.enc}")
     private String encryptedKeySecret;
-
-
 
     private RazorpayClient razorpayClient;
 
@@ -59,24 +58,31 @@ public class OrderService {
         }
     }
 
-
-    // Create Order
+    // ✅ ONLINE: Create Razorpay order + save in DB
     public Orders createOrder(Orders order) {
 
         try {
-            logger.info("Creating order for email: {}", order.getEmail());
+            logger.info("Creating ONLINE order for email: {}", order.getEmail());
+
+            // Ensure ONLINE fields
+            order.setPaymentMode("ONLINE");
+            order.setOrderStatus("PENDING");
+
+            // Estimated delivery: ONLINE -> 4 days
+            if (order.getEstimatedDeliveryDate() == null) {
+                order.setEstimatedDeliveryDate(LocalDate.now().plusDays(4));
+            }
 
             JSONObject options = new JSONObject();
-            options.put("amount", order.getAmount() * 100); // in paise
+            options.put("amount", order.getAmount() * 100); // paise
             options.put("currency", Constants.CURRENCY_INR);
             options.put("receipt", order.getEmail());
 
             Order razorpayOrder = razorpayClient.orders.create(options);
 
-            order.setRazorpayOrderId(razorpayOrder.get("id"));
-            order.setOrderStatus(razorpayOrder.get("status"));
+            order.setRazorpayOrderId(razorpayOrder.get("id").toString());
 
-            logger.info("Razorpay order created with ID: {}", razorpayOrder.get("id").toString());
+            logger.info("Razorpay order created with ID: {}", order.getRazorpayOrderId());
 
             Orders savedOrder = ordersRepository.save(order);
             logger.info("Order saved in database with ID: {}", savedOrder.getOrderId());
@@ -92,8 +98,38 @@ public class OrderService {
         }
     }
 
-    // Update payment status
-    // Update payment status (callback_url only)
+    // ✅ COD: Create order directly (no Razorpay)
+    public Orders createCodOrder(Orders order) {
+        try {
+            logger.info("Creating COD order for email: {}", order.getEmail());
+
+            order.setPaymentMode("COD");
+            order.setOrderStatus("PENDING");
+            order.setRazorpayOrderId(null);
+
+            // Estimated delivery: COD -> 5 days
+            if (order.getEstimatedDeliveryDate() == null) {
+                order.setEstimatedDeliveryDate(LocalDate.now().plusDays(5));
+            }
+
+            Orders saved = ordersRepository.save(order);
+            logger.info("COD Order saved in database with ID: {}", saved.getOrderId());
+
+            return saved;
+
+        } catch (Exception e) {
+            logger.error("Unexpected error while creating COD order", e);
+            throw new RuntimeException("COD Order creation failed");
+        }
+    }
+
+    // ✅ Fetch order by id (for Order Success page)
+    public Orders getOrderById(Integer orderId) {
+        return ordersRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+    }
+
+    // ✅ Update payment status (callback_url only)
     public Orders updateStatus(Map<String, String> map) {
 
         logger.info("Updating payment status");
@@ -105,7 +141,7 @@ public class OrderService {
         String razorpayOrderId = map.get("razorpay_order_id");
         String paymentId = map.get("razorpay_payment_id");
 
-        // ✅ If order_id missing, fetch it from Razorpay using payment_id
+        // If order_id missing, fetch it from Razorpay using payment_id
         if (razorpayOrderId == null || razorpayOrderId.isBlank()) {
 
             if (paymentId == null || paymentId.isBlank()) {
@@ -136,12 +172,12 @@ public class OrderService {
             throw new RuntimeException("Order not found");
         }
 
-        order.setOrderStatus(Constants.PAYMENT_DONE);
+        // Mark as PAID
+        order.setOrderStatus(Constants.PAYMENT_DONE); // e.g. "PAID"
 
         Orders updatedOrder = ordersRepository.save(order);
         logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
 
         return updatedOrder;
     }
-
 }
