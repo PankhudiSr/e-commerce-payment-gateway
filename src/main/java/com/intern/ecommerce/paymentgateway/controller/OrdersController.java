@@ -26,6 +26,8 @@ public class OrdersController {
     @Autowired
     private OrderService orderService;
 
+
+
     // Load Orders page (if you are using Thymeleaf / template)
     @GetMapping("/orders")
     public String ordersPage() {
@@ -65,8 +67,10 @@ public class OrdersController {
 
         Orders saved = orderService.createCodOrder(orders);
 
-        logger.info("COD order created successfully with ID: {}", saved.getOrderId());
-        return new ResponseEntity<>(saved, HttpStatus.CREATED);
+
+
+//        logger.info("COD order created successfully with ID: {}", saved.getOrderId());
+       return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
     // ✅ Payment callback (Razorpay success/fail)
@@ -97,5 +101,14 @@ public class OrdersController {
         logger.info("Get order details for success page: {}", orderId);
         Orders order = orderService.getOrderById(orderId);
         return ResponseEntity.ok(order);
+    }
+
+    @GetMapping("/api/orders/user/{userId}")
+    @ResponseBody
+    public ResponseEntity<?> getOrdersByUser(@PathVariable Integer userId) {
+
+        logger.info("Fetching orders for user {}", userId);
+
+        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
     }
 }

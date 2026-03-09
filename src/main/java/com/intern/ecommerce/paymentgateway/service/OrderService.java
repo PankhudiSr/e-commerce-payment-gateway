@@ -2,8 +2,13 @@ package com.intern.ecommerce.paymentgateway.service;
 
 import com.intern.ecommerce.paymentgateway.security.AESUtil;
 import com.intern.ecommerce.paymentgateway.common.Constants;
+import com.intern.ecommerce.paymentgateway.dto.ProductDTO;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 import org.json.JSONObject;
@@ -39,6 +44,10 @@ public class OrderService {
 
     private RazorpayClient razorpayClient;
 
+    public List<Orders> getOrdersByUserId(Integer userId) {
+        return ordersRepository.findByUserId(userId);
+    }
+
     // Initialize Razorpay client
     @PostConstruct
     public void init() {
@@ -66,12 +75,31 @@ public class OrderService {
 
             // Ensure ONLINE fields
             order.setPaymentMode("ONLINE");
-            order.setOrderStatus("PENDING");
+            order.setOrderStatus("PLACED");
 
             // Estimated delivery: ONLINE -> 4 days
             if (order.getEstimatedDeliveryDate() == null) {
                 order.setEstimatedDeliveryDate(LocalDate.now().plusDays(4));
             }
+
+            RestTemplate restTemplate = new RestTemplate();
+
+            String productUrl = "http://localhost:8080/api/product/" + order.getProductId();
+
+            ResponseEntity<ProductDTO> response =
+                    restTemplate.getForEntity(productUrl, ProductDTO.class);
+
+            ProductDTO product = response.getBody();
+
+            if (product == null || product.getVendor() == null) {
+                throw new RuntimeException("Vendor not found for product " + order.getProductId());
+            }
+
+
+            Long vendorId = product.getVendor().getId();
+
+            order.setVendorId(vendorId);
+
 
             JSONObject options = new JSONObject();
             options.put("amount", order.getAmount() * 100); // paise
@@ -86,6 +114,16 @@ public class OrderService {
 
             Orders savedOrder = ordersRepository.save(order);
             logger.info("Order saved in database with ID: {}", savedOrder.getOrderId());
+
+
+
+            String deliveryUrl = "http://localhost:8080/api/delivery/create"
+                    + "?productId=" + order.getProductId()
+                    + "&vendorId=" + order.getVendorId()
+                    + "&userId=" + order.getUserId()
+                    + "&quantity=" + order.getQuantity();
+
+            restTemplate.postForObject(deliveryUrl, null, String.class);
 
             return savedOrder;
 
@@ -104,13 +142,30 @@ public class OrderService {
             logger.info("Creating COD order for email: {}", order.getEmail());
 
             order.setPaymentMode("COD");
-            order.setOrderStatus("PENDING");
+            order.setOrderStatus("PLACED");
             order.setRazorpayOrderId(null);
-
             // Estimated delivery: COD -> 5 days
             if (order.getEstimatedDeliveryDate() == null) {
                 order.setEstimatedDeliveryDate(LocalDate.now().plusDays(5));
             }
+
+            RestTemplate restTemplate = new RestTemplate();
+
+            String productUrl = "http://localhost:8080/api/product/" + order.getProductId();
+
+            ResponseEntity<ProductDTO> response =
+                    restTemplate.getForEntity(productUrl, ProductDTO.class);
+
+            ProductDTO product = response.getBody();
+
+            if (product == null || product.getVendor() == null) {
+                throw new RuntimeException("Vendor not found for product " + order.getProductId());
+            }
+
+
+            Long vendorId = product.getVendor().getId();
+
+            order.setVendorId(vendorId);
 
             Orders saved = ordersRepository.save(order);
             logger.info("COD Order saved in database with ID: {}", saved.getOrderId());
@@ -173,11 +228,14 @@ public class OrderService {
         }
 
         // Mark as PAID
-        order.setOrderStatus(Constants.PAYMENT_DONE); // e.g. "PAID"
+        order.setOrderStatus("PLACED"); // e.g. "PAID"
 
         Orders updatedOrder = ordersRepository.save(order);
         logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
 
         return updatedOrder;
     }
+
+
+
 }
