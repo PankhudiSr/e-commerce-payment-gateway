@@ -26,24 +26,20 @@ public class OrdersController {
     @Autowired
     private OrderService orderService;
 
-    // Load Orders page (if you are using Thymeleaf / template)
     @GetMapping("/orders")
     public String ordersPage() {
         logger.info("Orders page requested");
         return "orders";
     }
 
-    // ✅ ONLINE: Create Razorpay order
-    // Frontend calls: POST /createOrder
     @PostMapping(value = "/createOrder", produces = "application/json")
     @ResponseBody
     public ResponseEntity<Orders> createOrder(@RequestBody Orders orders)
             throws RazorpayException {
 
         logger.info("Create ONLINE order API called");
-        // ensure it's ONLINE
+
         orders.setPaymentMode("ONLINE");
-        // status stays PENDING until paymentCallback updates it
         orders.setOrderStatus("PENDING");
 
         Orders razorpayOrder = orderService.createOrder(orders);
@@ -52,13 +48,12 @@ public class OrdersController {
         return new ResponseEntity<>(razorpayOrder, HttpStatus.CREATED);
     }
 
-    // ✅ COD: Create order without Razorpay
-    // Frontend calls: POST /createCodOrder
     @PostMapping(value = "/createCodOrder", produces = "application/json")
     @ResponseBody
     public ResponseEntity<Orders> createCodOrder(@RequestBody Orders orders) {
 
         logger.info("Create COD order API called");
+
         orders.setPaymentMode("COD");
         orders.setOrderStatus("PENDING");
         orders.setRazorpayOrderId(null);
@@ -69,7 +64,6 @@ public class OrdersController {
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
-    // ✅ Payment callback (Razorpay success/fail)
     @PostMapping("/paymentCallback")
     @ResponseBody
     public ResponseEntity<?> paymentCallback(@RequestParam Map<String, String> response) {
@@ -88,8 +82,6 @@ public class OrdersController {
         ));
     }
 
-    // ✅ API for Success Page (React)
-    // Frontend calls: GET /api/orders/{orderId}
     @GetMapping(value = "/api/orders/{orderId}", produces = "application/json")
     @ResponseBody
     public ResponseEntity<Orders> getOrder(@PathVariable Integer orderId) {

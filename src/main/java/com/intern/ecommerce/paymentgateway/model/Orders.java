@@ -21,7 +21,7 @@ public class Orders {
     private String name;
     private String email;
 
-    // amount in rupees (example: 499)
+    // amount in rupees
     private Integer amount;
 
     // ONLINE or COD
@@ -36,16 +36,19 @@ public class Orders {
     // estimated delivery date
     private LocalDate estimatedDeliveryDate;
 
-    // created time (optional but useful)
+    // created time
     private LocalDateTime createdAt;
+
+    // ---- added for quick vendor tracking solution ----
+    private Long productId;
+    private Long vendorId;
+    private Integer quantity;
 
     @PrePersist
     public void onCreate() {
         this.createdAt = LocalDateTime.now();
 
-        // if delivery date not set from controller/service, set a default
         if (this.estimatedDeliveryDate == null) {
-            // ONLINE -> 4 days, COD -> 5 days
             if ("ONLINE".equalsIgnoreCase(this.paymentMode)) {
                 this.estimatedDeliveryDate = LocalDate.now().plusDays(4);
             } else {
@@ -53,13 +56,10 @@ public class Orders {
             }
         }
 
-        // if order status not set, keep pending
         if (this.orderStatus == null || this.orderStatus.trim().isEmpty()) {
             this.orderStatus = "PENDING";
         }
     }
-
-    // ---------------- GETTERS & SETTERS ----------------
 
     public Integer getOrderId() {
         return orderId;
@@ -131,5 +131,29 @@ public class Orders {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
+    }
+
+    public Long getVendorId() {
+        return vendorId;
+    }
+
+    public void setVendorId(Long vendorId) {
+        this.vendorId = vendorId;
+    }
+
+    public Integer getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
     }
 }

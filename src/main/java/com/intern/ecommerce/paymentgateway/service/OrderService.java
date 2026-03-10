@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import com.intern.ecommerce.paymentgateway.model.Orders;
 import com.intern.ecommerce.paymentgateway.repository.OrdersRepository;
@@ -31,6 +32,9 @@ public class OrderService {
     @Autowired
     private OrdersRepository ordersRepository;
 
+    @Autowired
+    private RestTemplate restTemplate;
+
     @Value("${razorpay.key.id.enc}")
     private String encryptedKeyId;
 
@@ -39,7 +43,8 @@ public class OrderService {
 
     private RazorpayClient razorpayClient;
 
-    // Initialize Razorpay client
+    private static final String PRODUCT_BACKEND_URL = "http://localhost:8080";
+
     @PostConstruct
     public void init() {
         try {
@@ -58,34 +63,31 @@ public class OrderService {
         }
     }
 
-    // ✅ ONLINE: Create Razorpay order + save in DB
     public Orders createOrder(Orders order) {
-
         try {
             logger.info("Creating ONLINE order for email: {}", order.getEmail());
 
-            // Ensure ONLINE fields
             order.setPaymentMode("ONLINE");
             order.setOrderStatus("PENDING");
 
-            // Estimated delivery: ONLINE -> 4 days
             if (order.getEstimatedDeliveryDate() == null) {
                 order.setEstimatedDeliveryDate(LocalDate.now().plusDays(4));
             }
 
             JSONObject options = new JSONObject();
-            options.put("amount", order.getAmount() * 100); // paise
+            options.put("amount", order.getAmount() * 100);
             options.put("currency", Constants.CURRENCY_INR);
             options.put("receipt", order.getEmail());
 
             Order razorpayOrder = razorpayClient.orders.create(options);
-
             order.setRazorpayOrderId(razorpayOrder.get("id").toString());
 
             logger.info("Razorpay order created with ID: {}", order.getRazorpayOrderId());
 
             Orders savedOrder = ordersRepository.save(order);
             logger.info("Order saved in database with ID: {}", savedOrder.getOrderId());
+
+            createDeliveryEntry(savedOrder);
 
             return savedOrder;
 
@@ -98,7 +100,6 @@ public class OrderService {
         }
     }
 
-    // ✅ COD: Create order directly (no Razorpay)
     public Orders createCodOrder(Orders order) {
         try {
             logger.info("Creating COD order for email: {}", order.getEmail());
@@ -107,13 +108,14 @@ public class OrderService {
             order.setOrderStatus("PENDING");
             order.setRazorpayOrderId(null);
 
-            // Estimated delivery: COD -> 5 days
             if (order.getEstimatedDeliveryDate() == null) {
                 order.setEstimatedDeliveryDate(LocalDate.now().plusDays(5));
             }
 
             Orders saved = ordersRepository.save(order);
             logger.info("COD Order saved in database with ID: {}", saved.getOrderId());
+
+            createDeliveryEntry(saved);
 
             return saved;
 
@@ -123,13 +125,35 @@ public class OrderService {
         }
     }
 
-    // ✅ Fetch order by id (for Order Success page)
+    private void createDeliveryEntry(Orders order) {
+        try {
+            if (order.getProductId() == null || order.getVendorId() == null || order.getQuantity() == null) {
+                logger.warn("Skipping delivery creation because productId/vendorId/quantity is null for orderId={}",
+                        order.getOrderId());
+                return;
+            }
+
+            String url = PRODUCT_BACKEND_URL + "/api/delivery/create"
+                    + "?productId=" + order.getProductId()
+                    + "&vendorId=" + order.getVendorId()
+                    + "&quantity=" + order.getQuantity();
+
+            logger.info("Calling delivery API: {}", url);
+
+            restTemplate.postForEntity(url, null, String.class);
+
+            logger.info("Delivery entry created successfully for orderId={}", order.getOrderId());
+
+        } catch (Exception e) {
+            logger.error("Failed to create delivery entry for orderId={}", order.getOrderId(), e);
+        }
+    }
+
     public Orders getOrderById(Integer orderId) {
         return ordersRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
     }
 
-    // ✅ Update payment status (callback_url only)
     public Orders updateStatus(Map<String, String> map) {
 
         logger.info("Updating payment status");
@@ -141,7 +165,6 @@ public class OrderService {
         String razorpayOrderId = map.get("razorpay_order_id");
         String paymentId = map.get("razorpay_payment_id");
 
-        // If order_id missing, fetch it from Razorpay using payment_id
         if (razorpayOrderId == null || razorpayOrderId.isBlank()) {
 
             if (paymentId == null || paymentId.isBlank()) {
@@ -172,8 +195,7 @@ public class OrderService {
             throw new RuntimeException("Order not found");
         }
 
-        // Mark as PAID
-        order.setOrderStatus(Constants.PAYMENT_DONE); // e.g. "PAID"
+        order.setOrderStatus(Constants.PAYMENT_DONE);
 
         Orders updatedOrder = ordersRepository.save(order);
         logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
