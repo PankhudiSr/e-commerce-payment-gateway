@@ -26,6 +26,7 @@ public class OrdersController {
     @Autowired
     private OrderService orderService;
 
+
     @GetMapping("/orders")
     public String ordersPage() {
         logger.info("Orders page requested");
@@ -60,8 +61,10 @@ public class OrdersController {
 
         Orders saved = orderService.createCodOrder(orders);
 
-        logger.info("COD order created successfully with ID: {}", saved.getOrderId());
-        return new ResponseEntity<>(saved, HttpStatus.CREATED);
+
+
+//        logger.info("COD order created successfully with ID: {}", saved.getOrderId());
+       return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
     @PostMapping("/paymentCallback")
@@ -89,5 +92,14 @@ public class OrdersController {
         logger.info("Get order details for success page: {}", orderId);
         Orders order = orderService.getOrderById(orderId);
         return ResponseEntity.ok(order);
+    }
+
+    @GetMapping("/api/orders/user/{userId}")
+    @ResponseBody
+    public ResponseEntity<?> getOrdersByUser(@PathVariable Integer userId) {
+
+        logger.info("Fetching orders for user {}", userId);
+
+        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
     }
 }
