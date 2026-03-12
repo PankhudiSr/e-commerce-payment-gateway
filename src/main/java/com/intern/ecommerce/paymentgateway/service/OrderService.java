@@ -177,15 +177,22 @@ public class OrderService {
 
     private void createDeliveryEntry(Orders order) {
         try {
-            if (order.getProductId() == null || order.getVendorId() == null || order.getQuantity() == null) {
-                logger.warn("Skipping delivery creation because productId/vendorId/quantity is null for orderId={}",
-                        order.getOrderId());
+            if (order.getProductId() == null ||
+                    order.getVendorId() == null ||
+                    order.getUserId() == null ||
+                    order.getQuantity() == null) {
+
+                logger.warn(
+                        "Skipping delivery creation because productId/vendorId/userId/quantity is null for orderId={}",
+                        order.getOrderId()
+                );
                 return;
             }
 
             String url = PRODUCT_BACKEND_URL + "/api/delivery/create"
                     + "?productId=" + order.getProductId()
                     + "&vendorId=" + order.getVendorId()
+                    + "&userId=" + order.getUserId()
                     + "&quantity=" + order.getQuantity();
 
             logger.info("Calling delivery API: {}", url);
