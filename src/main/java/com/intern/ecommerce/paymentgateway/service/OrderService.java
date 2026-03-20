@@ -200,10 +200,11 @@ public class OrderService {
             if (order.getProductId() == null ||
                     order.getVendorId() == null ||
                     order.getUserId() == null ||
-                    order.getQuantity() == null) {
+                    order.getQuantity() == null ||
+                    order.getOrderId() == null) {
 
                 logger.warn(
-                        "Skipping delivery creation because productId/vendorId/userId/quantity is null for orderId={}",
+                        "Skipping delivery creation because productId/vendorId/userId/quantity/orderId is null for orderId={}",
                         order.getOrderId()
                 );
                 return;
@@ -213,7 +214,8 @@ public class OrderService {
                     + "?productId=" + order.getProductId()
                     + "&vendorId=" + order.getVendorId()
                     + "&userId=" + order.getUserId()
-                    + "&quantity=" + order.getQuantity();
+                    + "&quantity=" + order.getQuantity()
+                    + "&orderId=" + order.getOrderId();
 
             logger.info("Calling delivery API: {}", url);
 
@@ -285,6 +287,24 @@ public class OrderService {
 
         Orders updatedOrder = ordersRepository.save(order);
         logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
+
+        return updatedOrder;
+    }
+
+    public Orders updateOrderTrackingStatus(Integer orderId, String status) {
+        logger.info("Updating tracking status for orderId={} to {}", orderId, status);
+
+        Orders order = ordersRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+
+        if (status == null || status.isBlank()) {
+            throw new IllegalArgumentException("Status cannot be null or blank");
+        }
+
+        order.setOrderStatus(status);
+
+        Orders updatedOrder = ordersRepository.save(order);
+        logger.info("Tracking status updated successfully for orderId={}", updatedOrder.getOrderId());
 
         return updatedOrder;
     }

@@ -26,7 +26,6 @@ public class OrdersController {
     @Autowired
     private OrderService orderService;
 
-
     @GetMapping("/orders")
     public String ordersPage() {
         logger.info("Orders page requested");
@@ -62,8 +61,6 @@ public class OrdersController {
         Orders saved = orderService.createCodOrder(orders);
 
 
-
-//        logger.info("COD order created successfully with ID: {}", saved.getOrderId());
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
@@ -101,5 +98,23 @@ public class OrdersController {
         logger.info("Fetching orders for user {}", userId);
 
         return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+    }
+
+    @PutMapping("/api/orders/update-status/{orderId}")
+    @ResponseBody
+    public ResponseEntity<?> updateOrderStatus(
+            @PathVariable Integer orderId,
+            @RequestBody Map<String, String> request) {
+
+        String status = request.get("status");
+        logger.info("Updating order status for orderId={} to {}", orderId, status);
+
+        Orders updatedOrder = orderService.updateOrderTrackingStatus(orderId, status);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Order status updated successfully",
+                "orderId", updatedOrder.getOrderId(),
+                "status", updatedOrder.getOrderStatus()
+        ));
     }
 }
