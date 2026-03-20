@@ -158,6 +158,7 @@ public class OrderService {
             }
 
 
+
             Long vendorId = product.getVendor().getId();
 
             order.setVendorId(vendorId);
@@ -206,6 +207,7 @@ public class OrderService {
         }
     }
 
+
     public Orders getOrderById(Integer orderId) {
         return ordersRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
@@ -251,7 +253,6 @@ public class OrderService {
             logger.error("Order not found for Razorpay Order ID: {}", razorpayOrderId);
             throw new RuntimeException("Order not found");
         }
-
 
         order.setOrderStatus(Constants.PAYMENT_DONE);
 
