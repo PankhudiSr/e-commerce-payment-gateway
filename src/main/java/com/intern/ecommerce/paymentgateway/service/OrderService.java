@@ -3,30 +3,25 @@ package com.intern.ecommerce.paymentgateway.service;
 import com.intern.ecommerce.paymentgateway.security.AESUtil;
 import com.intern.ecommerce.paymentgateway.common.Constants;
 import com.intern.ecommerce.paymentgateway.dto.ProductDTO;
-import org.springframework.context.annotation.Bean;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.ResponseEntity;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-
+import com.intern.ecommerce.paymentgateway.model.Orders;
+import com.intern.ecommerce.paymentgateway.repository.OrdersRepository;
+import com.razorpay.Order;
+import com.razorpay.Payment;
+import com.razorpay.RazorpayClient;
+import com.razorpay.RazorpayException;
+import jakarta.annotation.PostConstruct;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import com.intern.ecommerce.paymentgateway.model.Orders;
-import com.intern.ecommerce.paymentgateway.repository.OrdersRepository;
-import com.razorpay.Order;
-import com.razorpay.RazorpayClient;
-import com.razorpay.RazorpayException;
-import com.razorpay.Payment;
-
-import jakarta.annotation.PostConstruct;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class OrderService {
@@ -46,15 +41,14 @@ public class OrderService {
     @Value("${razorpay.key.secret.enc}")
     private String encryptedKeySecret;
 
-    private RazorpayClient razorpayClient;
     @Value("${PRODUCT_BACKEND_URL}")
     private String PRODUCT_BACKEND_URL;
+
+    private RazorpayClient razorpayClient;
 
     public List<Orders> getOrdersByUserId(Integer userId) {
         return ordersRepository.findByUserId(userId);
     }
-
-    // Initialize Razorpay client
 
     @PostConstruct
     public void init() {
@@ -85,24 +79,14 @@ public class OrderService {
                 order.setEstimatedDeliveryDate(LocalDate.now().plusDays(4));
             }
 
-            RestTemplate restTemplate = new RestTemplate();
-
-            String productUrl = "http://localhost:8080/api/product/" + order.getProductId();
-
-            ResponseEntity<ProductDTO> response =
-                    restTemplate.getForEntity(productUrl, ProductDTO.class);
-
-            ProductDTO product = response.getBody();
+            ProductDTO product = fetchProductById(order.getProductId());
 
             if (product == null || product.getVendor() == null) {
                 throw new RuntimeException("Vendor not found for product " + order.getProductId());
             }
 
-
             Long vendorId = product.getVendor().getId();
-
             order.setVendorId(vendorId);
-
 
             JSONObject options = new JSONObject();
             options.put("amount", order.getAmount() * 100);
@@ -117,9 +101,7 @@ public class OrderService {
             Orders savedOrder = ordersRepository.save(order);
             logger.info("Order saved in database with ID: {}", savedOrder.getOrderId());
 
-
             createDeliveryEntry(savedOrder);
-
 
             return savedOrder;
 
@@ -128,7 +110,7 @@ public class OrderService {
             throw new RuntimeException("Payment gateway error. Please try again.");
         } catch (Exception e) {
             logger.error("Unexpected error while creating order", e);
-            throw new RuntimeException("Order creation failed");
+            throw new RuntimeException("Order creation failed: " + e.getMessage());
         }
     }
 
@@ -144,27 +126,28 @@ public class OrderService {
                 order.setEstimatedDeliveryDate(LocalDate.now().plusDays(5));
             }
 
-            RestTemplate restTemplate = new RestTemplate();
-
-            String productUrl = "http://localhost:8080/api/product/" + order.getProductId();
-
-            ResponseEntity<ProductDTO> response =
-                    restTemplate.getForEntity(productUrl, ProductDTO.class);
-
-            ProductDTO product = response.getBody();
+            ProductDTO product = fetchProductById(order.getProductId());
 
             if (product == null || product.getVendor() == null) {
                 throw new RuntimeException("Vendor not found for product " + order.getProductId());
             }
 
 
-
             Long vendorId = product.getVendor().getId();
-
             order.setVendorId(vendorId);
+
+            if (product.getQuantity() == null || order.getQuantity() == null) {
+                throw new RuntimeException("Product quantity data missing");
+            }
+
+            if (order.getQuantity() > product.getQuantity()) {
+                throw new RuntimeException("Not enough stock available");
+            }
 
             Orders saved = ordersRepository.save(order);
             logger.info("COD Order saved in database with ID: {}", saved.getOrderId());
+
+            reduceProductStock(saved.getProductId(), saved.getQuantity());
 
             createDeliveryEntry(saved);
 
@@ -172,7 +155,43 @@ public class OrderService {
 
         } catch (Exception e) {
             logger.error("Unexpected error while creating COD order", e);
-            throw new RuntimeException("COD Order creation failed");
+            throw new RuntimeException("COD Order creation failed: " + e.getMessage());
+        }
+    }
+
+    private ProductDTO fetchProductById(Long productId) {
+        try {
+            String productUrl = PRODUCT_BACKEND_URL + "/api/product/" + productId;
+
+            ResponseEntity<ProductDTO> response =
+                    restTemplate.getForEntity(productUrl, ProductDTO.class);
+
+            return response.getBody();
+        } catch (Exception e) {
+            logger.error("Failed to fetch product details for productId={}", productId, e);
+            throw new RuntimeException("Failed to fetch product details: " + e.getMessage());
+        }
+    }
+
+    private void reduceProductStock(Long productId, Integer orderedQty) {
+        try {
+            if (productId == null || orderedQty == null || orderedQty <= 0) {
+                throw new RuntimeException("Invalid productId or ordered quantity");
+            }
+
+            String url = PRODUCT_BACKEND_URL
+                    + "/api/product/reduce-stock/" + productId
+                    + "?quantity=" + orderedQty;
+
+            logger.info("Calling stock reduction API: {}", url);
+
+            restTemplate.postForObject(url, null, Object.class);
+
+            logger.info("Stock reduced successfully for productId={}, qty={}", productId, orderedQty);
+
+        } catch (Exception e) {
+            logger.error("Failed to reduce stock for productId={}, qty={}", productId, orderedQty, e);
+            throw new RuntimeException("Failed to reduce product stock: " + e.getMessage());
         }
     }
 
@@ -254,15 +273,19 @@ public class OrderService {
             throw new RuntimeException("Order not found");
         }
 
-        order.setOrderStatus(Constants.PAYMENT_DONE);
+        if (Constants.PAYMENT_DONE.equals(order.getOrderStatus())) {
+            logger.info("Payment already updated for Order ID: {}", order.getOrderId());
+            return order;
+        }
 
+        reduceProductStock(order.getProductId(), order.getQuantity());
+
+
+        order.setOrderStatus(Constants.PAYMENT_DONE);
 
         Orders updatedOrder = ordersRepository.save(order);
         logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
 
         return updatedOrder;
     }
-
-
-
 }
