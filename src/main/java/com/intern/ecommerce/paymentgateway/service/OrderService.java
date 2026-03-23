@@ -275,7 +275,7 @@ public class OrderService {
             throw new RuntimeException("Order not found");
         }
 
-        if (Constants.PAYMENT_DONE.equals(order.getOrderStatus())) {
+        if ("PAYMENT_DONE".equals(order.getPaymentMode())) {
             logger.info("Payment already updated for Order ID: {}", order.getOrderId());
             return order;
         }
@@ -283,7 +283,10 @@ public class OrderService {
         reduceProductStock(order.getProductId(), order.getQuantity());
 
 
+
         order.setOrderStatus(Constants.PAYMENT_DONE);
+
+
 
         Orders updatedOrder = ordersRepository.save(order);
         logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
