@@ -6,9 +6,11 @@ import com.intern.ecommerce.paymentgateway.model.Orders;
 
 import java.util.List;
 
-public interface OrdersRepository extends JpaRepository<Orders, Integer>{
+public interface OrdersRepository extends JpaRepository<Orders, Integer> {
 
     Orders findByRazorpayOrderId(String razorpayId);
-    List<Orders> findByUserId(Integer userId);
 
+    List<Orders> findAllByRazorpayOrderId(String razorpayId);
+
+    List<Orders> findByUserId(Integer userId);
 }

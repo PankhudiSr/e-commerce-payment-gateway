@@ -2,6 +2,8 @@ package com.intern.ecommerce.paymentgateway.service;
 
 import com.intern.ecommerce.paymentgateway.security.AESUtil;
 import com.intern.ecommerce.paymentgateway.common.Constants;
+import com.intern.ecommerce.paymentgateway.dto.CreateOrderRequest;
+import com.intern.ecommerce.paymentgateway.dto.OrderItemRequest;
 import com.intern.ecommerce.paymentgateway.dto.ProductDTO;
 import com.intern.ecommerce.paymentgateway.model.Orders;
 import com.intern.ecommerce.paymentgateway.repository.OrdersRepository;
@@ -68,42 +70,62 @@ public class OrderService {
         }
     }
 
-    public Orders createOrder(Orders order) {
+    public Orders createOrder(CreateOrderRequest request) {
         try {
-            logger.info("Creating ONLINE order for email: {}", order.getEmail());
+            logger.info("Creating ONLINE order for email: {}", request.getEmail());
 
-            order.setPaymentMode("ONLINE");
-            order.setOrderStatus("PLACED");
-
-            if (order.getEstimatedDeliveryDate() == null) {
-                order.setEstimatedDeliveryDate(LocalDate.now().plusDays(4));
+            if (request.getItems() == null || request.getItems().isEmpty()) {
+                throw new RuntimeException("Cart items are missing");
             }
-
-            ProductDTO product = fetchProductById(order.getProductId());
-
-            if (product == null || product.getVendor() == null) {
-                throw new RuntimeException("Vendor not found for product " + order.getProductId());
-            }
-
-            Long vendorId = product.getVendor().getId();
-            order.setVendorId(vendorId);
 
             JSONObject options = new JSONObject();
-            options.put("amount", order.getAmount() * 100);
+            options.put("amount", request.getAmount() * 100);
             options.put("currency", Constants.CURRENCY_INR);
-            options.put("receipt", order.getEmail());
+            options.put("receipt", request.getEmail());
 
             Order razorpayOrder = razorpayClient.orders.create(options);
-            order.setRazorpayOrderId(razorpayOrder.get("id").toString());
+            String razorpayOrderId = razorpayOrder.get("id").toString();
 
-            logger.info("Razorpay order created with ID: {}", order.getRazorpayOrderId());
+            logger.info("Razorpay order created with ID: {}", razorpayOrderId);
 
-            Orders savedOrder = ordersRepository.save(order);
-            logger.info("Order saved in database with ID: {}", savedOrder.getOrderId());
+            Orders firstSavedOrder = null;
 
-            createDeliveryEntry(savedOrder);
+            for (OrderItemRequest item : request.getItems()) {
+                ProductDTO product = fetchProductById(item.getProductId());
 
-            return savedOrder;
+                if (product == null || product.getVendor() == null) {
+                    throw new RuntimeException("Vendor not found for product " + item.getProductId());
+                }
+
+                Long vendorId = product.getVendor().getId();
+
+                Orders order = new Orders();
+                order.setUserId(request.getUserId());
+                order.setName(request.getName());
+                order.setEmail(request.getEmail());
+                order.setAmount(item.getTotalPrice());
+                order.setPaymentMode("ONLINE");
+                order.setOrderStatus("PLACED");
+                order.setRazorpayOrderId(razorpayOrderId);
+                order.setProductId(item.getProductId());
+                order.setVendorId(vendorId);
+                order.setQuantity(item.getQuantity());
+
+                if (order.getEstimatedDeliveryDate() == null) {
+                    order.setEstimatedDeliveryDate(LocalDate.now().plusDays(4));
+                }
+
+                Orders savedOrder = ordersRepository.save(order);
+                logger.info("Order saved in database with ID: {}", savedOrder.getOrderId());
+
+                createDeliveryEntry(savedOrder);
+
+                if (firstSavedOrder == null) {
+                    firstSavedOrder = savedOrder;
+                }
+            }
+
+            return firstSavedOrder;
 
         } catch (RazorpayException e) {
             logger.error("Error while creating Razorpay order", e);
@@ -114,44 +136,61 @@ public class OrderService {
         }
     }
 
-    public Orders createCodOrder(Orders order) {
+    public Orders createCodOrder(CreateOrderRequest request) {
         try {
-            logger.info("Creating COD order for email: {}", order.getEmail());
+            logger.info("Creating COD order for email: {}", request.getEmail());
 
-            order.setPaymentMode("COD");
-            order.setOrderStatus("PLACED");
-            order.setRazorpayOrderId(null);
-
-            if (order.getEstimatedDeliveryDate() == null) {
-                order.setEstimatedDeliveryDate(LocalDate.now().plusDays(5));
+            if (request.getItems() == null || request.getItems().isEmpty()) {
+                throw new RuntimeException("Cart items are missing");
             }
 
-            ProductDTO product = fetchProductById(order.getProductId());
+            Orders firstSavedOrder = null;
 
-            if (product == null || product.getVendor() == null) {
-                throw new RuntimeException("Vendor not found for product " + order.getProductId());
+            for (OrderItemRequest item : request.getItems()) {
+                ProductDTO product = fetchProductById(item.getProductId());
+
+                if (product == null || product.getVendor() == null) {
+                    throw new RuntimeException("Vendor not found for product " + item.getProductId());
+                }
+
+                Long vendorId = product.getVendor().getId();
+
+                if (product.getQuantity() == null || item.getQuantity() == null) {
+                    throw new RuntimeException("Product quantity data missing");
+                }
+
+                if (item.getQuantity() > product.getQuantity()) {
+                    throw new RuntimeException("Not enough stock available for productId " + item.getProductId());
+                }
+
+                Orders order = new Orders();
+                order.setUserId(request.getUserId());
+                order.setName(request.getName());
+                order.setEmail(request.getEmail());
+                order.setAmount(item.getTotalPrice());
+                order.setPaymentMode("COD");
+                order.setOrderStatus("PLACED");
+                order.setRazorpayOrderId(null);
+                order.setProductId(item.getProductId());
+                order.setVendorId(vendorId);
+                order.setQuantity(item.getQuantity());
+
+                if (order.getEstimatedDeliveryDate() == null) {
+                    order.setEstimatedDeliveryDate(LocalDate.now().plusDays(5));
+                }
+
+                Orders saved = ordersRepository.save(order);
+                logger.info("COD Order saved in database with ID: {}", saved.getOrderId());
+
+                reduceProductStock(saved.getProductId(), saved.getQuantity());
+                createDeliveryEntry(saved);
+
+                if (firstSavedOrder == null) {
+                    firstSavedOrder = saved;
+                }
             }
 
-
-            Long vendorId = product.getVendor().getId();
-            order.setVendorId(vendorId);
-
-            if (product.getQuantity() == null || order.getQuantity() == null) {
-                throw new RuntimeException("Product quantity data missing");
-            }
-
-            if (order.getQuantity() > product.getQuantity()) {
-                throw new RuntimeException("Not enough stock available");
-            }
-
-            Orders saved = ordersRepository.save(order);
-            logger.info("COD Order saved in database with ID: {}", saved.getOrderId());
-
-            reduceProductStock(saved.getProductId(), saved.getQuantity());
-
-            createDeliveryEntry(saved);
-
-            return saved;
+            return firstSavedOrder;
 
         } catch (Exception e) {
             logger.error("Unexpected error while creating COD order", e);
@@ -228,7 +267,6 @@ public class OrderService {
         }
     }
 
-
     public Orders getOrderById(Integer orderId) {
         return ordersRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
@@ -268,30 +306,23 @@ public class OrderService {
             throw new IllegalArgumentException("Razorpay order ID is missing even after fetching payment");
         }
 
-        Orders order = ordersRepository.findByRazorpayOrderId(razorpayOrderId);
+        List<Orders> orders = ordersRepository.findAllByRazorpayOrderId(razorpayOrderId);
 
-        if (order == null) {
-            logger.error("Order not found for Razorpay Order ID: {}", razorpayOrderId);
-            throw new RuntimeException("Order not found");
+        if (orders == null || orders.isEmpty()) {
+            logger.error("Orders not found for Razorpay Order ID: {}", razorpayOrderId);
+            throw new RuntimeException("Orders not found");
         }
 
-        if ("PAYMENT_DONE".equals(order.getPaymentMode())) {
-            logger.info("Payment already updated for Order ID: {}", order.getOrderId());
-            return order;
+        for (Orders order : orders) {
+            if (!Constants.PAYMENT_DONE.equals(order.getOrderStatus())) {
+                reduceProductStock(order.getProductId(), order.getQuantity());
+                order.setOrderStatus(Constants.PAYMENT_DONE);
+                ordersRepository.save(order);
+            }
         }
 
-        reduceProductStock(order.getProductId(), order.getQuantity());
-
-
-
-        order.setOrderStatus(Constants.PAYMENT_DONE);
-
-
-
-        Orders updatedOrder = ordersRepository.save(order);
-        logger.info("Payment completed for Order ID: {}", updatedOrder.getOrderId());
-
-        return updatedOrder;
+        logger.info("Payment completed for Razorpay Order ID: {}", razorpayOrderId);
+        return orders.get(0);
     }
 
     public Orders updateOrderTrackingStatus(Integer orderId, String status) {

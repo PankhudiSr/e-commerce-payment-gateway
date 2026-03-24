@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import com.intern.ecommerce.paymentgateway.dto.CreateOrderRequest;
 import com.intern.ecommerce.paymentgateway.model.Orders;
 import com.intern.ecommerce.paymentgateway.service.OrderService;
 import com.razorpay.RazorpayException;
@@ -34,15 +35,12 @@ public class OrdersController {
 
     @PostMapping(value = "/createOrder", produces = "application/json")
     @ResponseBody
-    public ResponseEntity<Orders> createOrder(@RequestBody Orders orders)
+    public ResponseEntity<Orders> createOrder(@RequestBody CreateOrderRequest request)
             throws RazorpayException {
 
         logger.info("Create ONLINE order API called");
 
-        orders.setPaymentMode("ONLINE");
-        orders.setOrderStatus("PENDING");
-
-        Orders razorpayOrder = orderService.createOrder(orders);
+        Orders razorpayOrder = orderService.createOrder(request);
 
         logger.info("ONLINE order created successfully with ID: {}", razorpayOrder.getOrderId());
         return new ResponseEntity<>(razorpayOrder, HttpStatus.CREATED);
@@ -50,16 +48,11 @@ public class OrdersController {
 
     @PostMapping(value = "/createCodOrder", produces = "application/json")
     @ResponseBody
-    public ResponseEntity<Orders> createCodOrder(@RequestBody Orders orders) {
+    public ResponseEntity<Orders> createCodOrder(@RequestBody CreateOrderRequest request) {
 
         logger.info("Create COD order API called");
 
-        orders.setPaymentMode("COD");
-        orders.setOrderStatus("PENDING");
-        orders.setRazorpayOrderId(null);
-
-        Orders saved = orderService.createCodOrder(orders);
-
+        Orders saved = orderService.createCodOrder(request);
 
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
